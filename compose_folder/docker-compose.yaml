@@ -54,7 +54,7 @@ services:
       - postgres
     restart: unless-stopped
     volumes:
-      - /home/jeppe/projectfolder:/mounted_dir
+      - ./:/mounted_dir
 
   devicestate_connector:
     image: jeppeotte/device_state_connector:latest
@@ -65,7 +65,7 @@ services:
       - postgres
     restart: unless-stopped
     volumes:
-      - /home/jeppe/projectfolder:/mounted_dir
+      - ./:/mounted_dir
 
   infrastructure_manager:
     image: jeppeotte/infrastructure_manager:latest
@@ -76,7 +76,7 @@ services:
       - postgres
     restart: unless-stopped
     volumes:
-      - /home/jeppe/projectfolder:/mounted_dir
+      - ./:/mounted_dir
       - /var/run/docker.sock:/var/run/docker.sock:rw
     extra_hosts:
       - "localhost:host-gateway"
