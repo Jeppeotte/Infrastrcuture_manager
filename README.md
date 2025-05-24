@@ -82,9 +82,16 @@ ip a show eth0
 
 ### 3. Configure Docker Compose
 
-Create a folder where the software files will be stored, and inside that folder create a file named `docker-compose.yaml`.
+Instead of manually creating the `docker-compose.yaml` file, you can simply copy the entire `compose_folder` from this repository to a desired location on your device.
 
-Copy the Docker Compose file from this repository into your `docker-compose.yaml`.
+```bash
+git clone https://github.com/Jeppeotte/Infrastrcuture_manager
+cp -r Infrastrcuture_manager/compose_folder /your/target/folder
+```
+
+> Replace `/your/target/folder` with the path of the folder where it is copied to.
+
+Once copied, open the `docker-compose.yaml` file inside the `compose_folder` and make any necessary configuration changes.
 
 Modify the following to suit your system:
 
@@ -95,16 +102,6 @@ Modify the following to suit your system:
     - /absolute/path/to/your/folder:/mounted_dir:rw
     - /var/run/docker.sock:/var/run/docker.sock:rw
 ```
-
-* Set environment variables for system platform and architecture:
-
-  ```yaml
-  environment:
-    HOST_PLATFORM: linux
-    HOST_ARCH: amd64
-  ```
-
-* Add or adjust other environment variables as needed (refer to the Docker Compose file comments).
 
 ---
 
