@@ -93,7 +93,7 @@ cp -r Infrastrcuture_manager/compose_folder /your/target/folder
 
 Once copied, open the `docker-compose.yaml` file inside the `compose_folder` and make any necessary configuration changes.
 
-Inside the `docker-compose.yaml`, locate the `environment` section under the `infrastructure_manager` service, to update the Device IP in the Compose File:
+- Inside the `docker-compose.yaml`, locate the `environment` section under the `infrastructure_manager` service, to update the Device IP in the Compose File:
 
 ```yaml
 environment:
