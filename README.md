@@ -93,6 +93,17 @@ cp -r Infrastrcuture_manager/compose_folder /your/target/folder
 
 Once copied, open the `docker-compose.yaml` file inside the `compose_folder` and make any necessary configuration changes.
 
+Inside the `docker-compose.yaml`, locate the `environment` section under the `infrastructure_manager` service, to update the Device IP in the Compose File:
+
+```yaml
+environment:
+  - Backend_IP=172.20.1.151  # Replace with the IP of this device
+```
+
+Replace `172.20.1.151` with the **static IP address** of this device — the one hosting the infrastructure manager.
+
+This IP is used so that gateways and other services can reach the backend reliably.
+
 ---
 
 ### 4. Launch the Infrastructure Manager
