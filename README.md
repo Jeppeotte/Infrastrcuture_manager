@@ -93,16 +93,6 @@ cp -r Infrastrcuture_manager/compose_folder /your/target/folder
 
 Once copied, open the `docker-compose.yaml` file inside the `compose_folder` and make any necessary configuration changes.
 
-Modify the following to suit your system:
-
-- In the `volumes` section, update the path mapping to the absolute path of your folder:
-
-```yaml
-  volumes:
-    - /absolute/path/to/your/folder:/mounted_dir:rw
-    - /var/run/docker.sock:/var/run/docker.sock:rw
-```
-
 ---
 
 ### 4. Launch the Infrastructure Manager
