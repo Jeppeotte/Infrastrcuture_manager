@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: "admin"
+      POSTGRES_DB: "relationdata"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  timescale:
+    image: timescale/timescaledb:latest-pg17
+    container_name: timescale
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: "admin"
+      POSTGRES_DB: "devicedata"
+    volumes:
+      - ts_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  grafana:
+    image: grafana/grafana-oss
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_PLUGINS_PREINSTALL=benjaminfourmaux-status-panel,vonage-status-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana_conf:/etc/grafana/provisioning/datasources
+    ports:
+      - "3000:3000"
+
+  nanomq:
+    image: emqx/nanomq:latest-full
+    container_name: nanomq
+    restart: unless-stopped
+    volumes:
+      - nanomq_data:/var/lib/nanomq
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+
+  devicedata_connector:
+    image: jeppeotte/device_data_connector:latest
+    container_name: ddata_connector
+    depends_on:
+      - nanomq
+      - timescale
+      - postgres
+    restart: unless-stopped
+    volumes:
+      - /home/jeppe/projectfolder:/mounted_dir
+
+  devicestate_connector:
+    image: jeppeotte/device_state_connector:latest
+    container_name: dstate_connector
+    depends_on:
+      - nanomq
+      - timescale
+      - postgres
+    restart: unless-stopped
+    volumes:
+      - /home/jeppe/projectfolder:/mounted_dir
+
+  infrastructure_manager:
+    image: jeppeotte/infrastructure_manager:latest
+    container_name: inf_manager
+    depends_on:
+      - nanomq
+      - timescale
+      - postgres
+    restart: unless-stopped
+    volumes:
+      - /home/jeppe/projectfolder:/mounted_dir
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    extra_hosts:
+      - "localhost:host-gateway"
+    ports:
+      - "8000:8000"
+    privileged: true
+    environment:
+      - Backend_IP=172.20.1.151 # Replace with the IP of this device
+
+
+volumes:
+  pg_data:
+  ts_data:
+  grafana_data:
+  nanomq_data:
+
+networks:
+  db_network:
+    driver: bridge
