@@ -1,27 +1,15 @@
 services:
-  postgres:
-    image: postgres
-    container_name: postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_PASSWORD: "admin"
-      POSTGRES_DB: "relationdata"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-
   timescale:
     image: timescale/timescaledb:latest-pg17
     container_name: timescale
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: "admin"
-      POSTGRES_DB: "devicedata"
+      POSTGRES_DB: "postgres"
     volumes:
       - ts_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5432:5432"
 
   grafana:
     image: grafana/grafana-oss
@@ -51,10 +39,11 @@ services:
     depends_on:
       - nanomq
       - timescale
-      - postgres
     restart: unless-stopped
     volumes:
       - ./:/mounted_dir
+    extra_hosts:
+      - "localhost:host-gateway"
 
   devicestate_connector:
     image: jeppeotte/device_state_connector:latest
@@ -62,10 +51,11 @@ services:
     depends_on:
       - nanomq
       - timescale
-      - postgres
     restart: unless-stopped
     volumes:
       - ./:/mounted_dir
+    extra_hosts:
+      - "localhost:host-gateway"
 
   infrastructure_manager:
     image: jeppeotte/infrastructure_manager:latest
@@ -73,7 +63,6 @@ services:
     depends_on:
       - nanomq
       - timescale
-      - postgres
     restart: unless-stopped
     volumes:
       - ./:/mounted_dir
@@ -84,11 +73,10 @@ services:
       - "8000:8000"
     privileged: true
     environment:
-      - Backend_IP=172.20.1.151 # Replace with the IP of this device
+      - Backend_IP=172.20.1.152 # Replace with the IP of this device
 
 
 volumes:
-  pg_data:
   ts_data:
   grafana_data:
   nanomq_data:

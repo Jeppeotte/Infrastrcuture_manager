@@ -3,7 +3,7 @@ from sqlalchemy import inspect, select, MetaData, Table, desc, null, text
 from models.add_nodes import EdgeNode, Base, NodeConfig, NodeState, DeviceData, Trigger
 from models.manage_nodes import DeviceDataSchema
 from fastapi import HTTPException, status
-from db.db_session import postgres_engine, timescale_engine
+from db.db_session import db_engine
 from sqlalchemy import Column, String, TIMESTAMP, func
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,7 +15,7 @@ logger.setLevel(logging.DEBUG)
 
 def check_database_tables(db:Session):
     # Check if all the necessary tables exist
-    inspector = inspect(postgres_engine)
+    inspector = inspect(db_engine)
     tables_to_check = [EdgeNode, NodeState, DeviceData, Trigger]
 
     # Get existing table names from the database
@@ -34,21 +34,21 @@ def check_database_tables(db:Session):
                     detail=f"Failed to create {table_name} table: {str(e)}"
                 )
 
-def create_edge_node(postgres_db: Session, timescale_db: Session, node_data: NodeConfig):
+def create_edge_node(db: Session, node_data: NodeConfig):
     # Create an edgenode
     # Check for duplicate node_id
-    if postgres_db.query(EdgeNode).filter(EdgeNode.node_id == node_data.node_id).first():
+    if db.query(EdgeNode).filter(EdgeNode.node_id == node_data.node_id).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Node ID {node_data.node_id} already exists"
         )
 
     try:
-        # Create table for the group in TimescaleDB if needed
-        ts_inspector = inspect(timescale_engine)
+        # Create table for the group if needed
+        inspector = inspect(db_engine)
         group_table_name = f"{node_data.group_id}"
 
-        if group_table_name not in ts_inspector.get_table_names():
+        if group_table_name not in inspector.get_table_names():
             # Create a temporary metadata
             temp_metadata = MetaData()
 
@@ -62,10 +62,10 @@ def create_edge_node(postgres_db: Session, timescale_db: Session, node_data: Nod
             )
 
             # Create the table
-            temp_metadata.create_all(bind=timescale_db.bind)
+            temp_metadata.create_all(bind=db.bind)
 
             # Convert to TimescaleDB hypertable
-            with timescale_engine.connect() as conn:
+            with db_engine.connect() as conn:
                 conn.execute(text(
                     "SELECT create_hypertable(:table_name, 'time', if_not_exists => TRUE)"
                 ).bindparams(table_name=group_table_name))
@@ -83,13 +83,13 @@ def create_edge_node(postgres_db: Session, timescale_db: Session, node_data: Nod
             description=node_data.description,
             app_services=node_data.app_services
         )
-        postgres_db.add(db_node)
-        postgres_db.commit()
-        postgres_db.refresh(db_node)
+        db.add(db_node)
+        db.commit()
+        db.refresh(db_node)
         return db_node
 
     except Exception as e:
-        postgres_db.rollback()
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create node: {str(e)}")
 
 def add_device_to_node(node_id: str,device: str,db: Session):

@@ -1,31 +1,31 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.exc import SQLAlchemyError
+import logging
+import sys
 
-#Relational DB connection
-POSTGRESQL_URL = "postgresql://postgres:admin@localhost:5432/relationdata"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-#Time series data connection
-TIMESCALE_URL = "postgresql://postgres:admin@localhost:5433/devicedata"
+#Timescale database url
+db_url = "postgresql://postgres:admin@localhost:5432/postgres"
 
 Base = declarative_base()
 
-postgres_engine = create_engine(POSTGRESQL_URL)
-postgres_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=postgres_engine)
+db_engine = create_engine(db_url)
+db_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
 
-timescale_engine = create_engine(TIMESCALE_URL)
-timescale_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=timescale_engine)
-
-def get_postgres_db():
-    db: Session = postgres_SessionLocal()
+def get_db():
+    db: Session = db_SessionLocal()
     try:
         yield db
-    finally:
-        db.close()
-
-def get_timescale_db():
-    db: Session = timescale_SessionLocal()
-    try:
-        yield db
+    except SQLAlchemyError as e:
+        logger.error("Database error occurred")
+        raise
     finally:
         db.close()

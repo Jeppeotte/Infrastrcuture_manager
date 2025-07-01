@@ -47,71 +47,122 @@ def add_node_page():
     node_ip = ui.input("Gateway IP address")
     ui.label('Connections:')
 
-    connections = []
-    def toggle_mqtt(e):
-        if e.value:  # Checkbox checked
-            if 'MQTT' not in connections:
-                connections.append('MQTT')
-        else:  # Checkbox unchecked
-            if 'MQTT' in connections:
-                connections.remove('MQTT')
-
-    ui.checkbox('MQTT', on_change=toggle_mqtt)
-
-
     async def add_node():
+
+        selected_services = [name for name, cb in checkboxes.items() if cb.value]
         # Add the node to the system and configure it
         node_data = {"group_id": group_id.value,
                      "node_id": node_id.value,
                      "description": description.value,
                      "ip": node_ip.value,
-                     "app_services": connections,
+                     "app_services": selected_services,
                      "device_services": []
                      }
 
-        try:
-            # Show spinner
-            spinner = ui.spinner(size='2em')
-            spinner.visible = True
+        # Show spinner
+        spinner = ui.spinner(size='2em')
+        spinner.visible = True
 
+        try:
             # Configure timeout (e.g., 300 seconds = 5 minutes)
             timeout = httpx.Timeout(300.0, connect=10.0)
 
             async with httpx.AsyncClient(timeout=timeout) as client:
-                # First connect to the node and configure it
-                api_url = f"http://{node_ip.value}:8000/api/configure_node/configure_node"
-                node_response = await client.post(api_url, json=node_data)
+                # First try to connect to the node
+                try:
+                    api_url = f"http://{node_ip.value}:8000/api/configure_node/configure_node"
+                    node_response = await client.post(api_url, json=node_data)
 
-                if node_response.status_code != 200:
-                    ui.notify(f"Failed to configure node, status code: {node_response.status_code}", type="negative")
+                    if node_response.status_code != 200:
+                        error_detail = node_response.text if node_response.text else "No error details provided"
+                        ui.notify(f"Failed to configure gateway (HTTP {node_response.status_code}): {error_detail}",
+                                  type="negative")
+                        return
+
+                except httpx.ConnectError:
+                    ui.notify(f"Cannot connect to gateway at: {node_ip.value}. Please check: "
+                              f"1. The IP address is correct\n"
+                              f"2. The gateway is powered on\n"
+                              f"3. The gateway is on the same network\n",
+                              type="negative", timeout=10000)
+                    return
+                except httpx.TimeoutException:
+                    ui.notify(
+                        f"Connection to node at {node_ip.value} timed out. The node might be busy or unresponsive.",
+                        type="negative")
+                    return
+                except httpx.RequestError as e:
+                    ui.notify(f"Network error while contacting node: {str(e)}", type="negative")
                     return
 
-                # Second connect to the node and establish connection between it and the MQTT broker
-                # Get the ip of this device where the broker is hosted
-                MQTT_broker_ip = os.getenv("Backend_IP")
-                api_url = f"http://{node_ip.value}:8000/api/configure_node/MQTT"
-                node_response = await client.post(api_url, json={"ip": MQTT_broker_ip})
+                # Second connect to the node for MQTT setup
+                try:
+                    MQTT_broker_ip = os.getenv("Backend_IP")
 
-                if node_response.status_code != 200:
-                    ui.notify(f"Failed to start the mqtt application, status code: {node_response.status_code}", type="negative")
+                    if not MQTT_broker_ip:
+                        ui.notify("Backend IP is not configured in environment variables", type="negative")
+                        ui.notify("Setting it to standard 192.168.0.152")
+                        MQTT_broker_ip = "192.168.0.152"
+
+                    api_url = f"http://{node_ip.value}:8000/api/configure_node/MQTT"
+                    node_response = await client.post(api_url, json={"ip": MQTT_broker_ip})
+
+                    if node_response.status_code != 200:
+                        error_detail = node_response.text if node_response.text else "No error details provided"
+                        ui.notify(f"Failed to configure MQTT (HTTP {node_response.status_code}): {error_detail}",
+                                  type="negative")
+                        return
+
+                except Exception as e:
+                    ui.notify(f"Error during MQTT configuration: {str(e)}", type="negative")
                     return
-
 
                 # Third add the node to the database
-                database_response = await client.post("http://localhost:8000/api/add_nodes/create_node",
-                                                      json=node_data)
+                try:
+                    database_response = await client.post(
+                        "http://localhost:8000/api/add_nodes/create_node",
+                        json=node_data
+                    )
 
-                if database_response.status_code != 200:
-                    ui.notify(f"Failed to create node in db, status code: {database_response.status_code}",
-                              type="negative")
+                    if database_response.status_code != 200:
+                        error_detail = database_response.text if database_response.text else "No error details provided"
+                        ui.notify(f"Database error (HTTP {database_response.status_code}): {error_detail}",
+                                  type="negative")
+                        return
+
+                    ui.notify("Node successfully configured and added", type="positive")
+
+                except Exception as e:
+                    ui.notify(f"Database operation failed: {str(e)}", type="negative")
                     return
 
-                ui.notify("Node successfully configured and added")
-
         except Exception as e:
-            ui.notify(f"Failed during node setup: {e}", type="negative")
+            ui.notify(f"Unexpected error during node setup: {str(e)}", type="negative")
         finally:
             spinner.visible = False
 
-    #
-    ui.button("Add gateway", on_click=add_node)
+    services = ['MQTT']  # Add more as needed
+    checkboxes = {}
+
+    def validate_selection():
+        """Update button state and tooltip based on checkbox selections"""
+        enabled = any(cb.value for cb in checkboxes.values())
+        if enabled:
+            add_button.enable()
+            add_button.clear()
+        else:
+            add_button.disable()
+            add_button.tooltip("Please select at least one service")
+        add_button.update()  # Force UI update
+
+    # Create checkboxes and bind change events
+    for service in services:
+        cb = ui.checkbox(service)
+        cb.on('update:modelValue', validate_selection)
+        checkboxes[service] = cb
+
+    # Button for adding the node
+    add_button = ui.button("Add gateway", on_click=add_node)
+    add_button.disable()
+    add_button.tooltip("Please select at least one service")
+

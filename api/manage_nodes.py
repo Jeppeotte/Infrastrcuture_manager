@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
-from db.db_session import get_postgres_db
+from db.db_session import get_db
 from db.db_operations import get_all_nodes, get_latest_node_state
 from models.add_nodes import Trigger
 import db.db_operations as db_op
@@ -49,13 +49,13 @@ class DeviceServiceTestParameters(BaseModel):
 router = APIRouter(prefix="/api/manage_nodes")
 
 @router.get("/get_all_nodes")
-async def get_all_nodes_info(db: Session = Depends(get_postgres_db)):
+async def get_all_nodes_info(db: Session = Depends(get_db)):
     #Get all nodes from the database
 
     return get_all_nodes(db)
 
 @router.get("/get_node_state")
-async def get_node_state(db: Session = Depends(get_postgres_db)):
+async def get_node_state(db: Session = Depends(get_db)):
     # Get the latest state of the nodes
     return get_latest_node_state(db)
 
@@ -68,7 +68,7 @@ async def activate_device_service():
 
 
 @router.get("/{node_id}")
-async def get_node_details(node_id: str, db: Session = Depends(get_postgres_db)):
+async def get_node_details(node_id: str, db: Session = Depends(get_db)):
     try:
         #logger.debug(f"Fetching data for node {node_id}")
 
@@ -92,7 +92,7 @@ async def get_node_details(node_id: str, db: Session = Depends(get_postgres_db))
 
 
 @router.post("/add_devicedata_db")
-async def add_devicedata_db(request: AddDeviceSchema, db: Session = Depends(get_postgres_db)):
+async def add_devicedata_db(request: AddDeviceSchema, db: Session = Depends(get_db)):
     try:
         with db.begin():  # Transaction context manager
             #Add to edge_nodes
@@ -108,12 +108,19 @@ async def add_devicedata_db(request: AddDeviceSchema, db: Session = Depends(get_
         return {"status": "success"}
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail={
+            "error": "Validation Error",
+            "message": str(e)
+        })
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+        raise HTTPException(status_code=500, detail={
+            "error": "Server Error",
+            "message": f"Server error: {str(e)}"
+        })
 
 @router.post("/delete_node")
-async def delete_node(node_id: str, db: Session = Depends(get_postgres_db)):
+async def delete_node(node_id: str, db: Session = Depends(get_db)):
     #Delete the edge node and all its devices from the database
     #Remeber to delete triggers from triggers table
     try:
@@ -125,7 +132,7 @@ async def delete_node(node_id: str, db: Session = Depends(get_postgres_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/delete_device")
-async def delete_device(node_id:str, device_id: str, db: Session = Depends(get_postgres_db)):
+async def delete_device(node_id:str, device_id: str, db: Session = Depends(get_db)):
     # Delete a specific device on an edge node and its triggers
     try:
         status = db_op.delete_device(device_id, node_id, db)

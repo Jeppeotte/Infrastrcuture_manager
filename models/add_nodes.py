@@ -1,5 +1,5 @@
 from sqlalchemy.ext.mutable import MutableList
-from sqlalchemy import Column, String, Time, Integer, DateTime, func
+from sqlalchemy import Column, String, TIMESTAMP, Integer, DateTime, func
 from sqlalchemy.inspection import inspect
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from db.db_session import Base
@@ -28,7 +28,7 @@ class EdgeNode(Base):
 class NodeState(Base):
     __tablename__ = "device_states"
 
-    time = Column(Time, primary_key=True, index=True)
+    time = Column(TIMESTAMP(timezone=True), primary_key=True, index=True)
     node_id = Column(String, primary_key=True, index=True)
     device_id = Column(String, nullable=True)
     message_type = Column(String, primary_key=True, index=True)

@@ -1,19 +1,35 @@
 from fastapi import FastAPI
-from fastapi.params import Depends
 from nicegui import ui
 import uvicorn
-from db.db_session import get_postgres_db
+from db.db_session import get_db
 from db.db_operations import check_database_tables
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+import sys
+import logging
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, db: Session = Depends(get_postgres_db)):
+async def lifespan(app: FastAPI):
     # On startup check if the needed database tables has been created
     try:
+        db = next(get_db())  # Get fresh DB session
         check_database_tables(db)
+        logger.info("Database verified successfully")
+    except SQLAlchemyError as e:
+        logger.critical(f"Database connection failed: {str(e)}")
+        sys.exit(1)
     except Exception as e:
-        raise RuntimeError(f"Database tables initialization failed: {str(e)}")
+        logger.critical(f"Unexpected startup error: {str(e)}")
+        sys.exit(1)
     yield
 
 # Initialize FastAPI
@@ -41,3 +57,4 @@ if __name__ == "__main__":
         title="Edge Node Manager"
     )
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
